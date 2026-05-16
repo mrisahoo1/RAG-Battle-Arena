@@ -1,20 +1,13 @@
 services:
   - type: web
     name: rag-battle-arena-api
-    env: docker
-    plan: starter
+    runtime: docker
+    plan: free
+    repo: https://github.com/mrisahoo1/RAG-Battle-Arena
+    branch: main
     dockerfilePath: ./Dockerfile
     healthCheckPath: /health
+    autoDeployTrigger: commit
     envVars:
       - key: ENABLE_DEMO_MODE
-        value: true
-      - key: OPENAI_API_KEY
-        sync: false
-      - key: DATABASE_URL
-        fromDatabase:
-          name: rag-battle-arena-postgres
-          property: connectionString
-
-databases:
-  - name: rag-battle-arena-postgres
-    plan: starter
+        value: "true"
