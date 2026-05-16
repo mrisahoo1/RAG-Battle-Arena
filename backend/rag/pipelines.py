@@ -7,7 +7,7 @@ from ingestion.chunker import TextChunk
 from retrieval.vector import vector_search
 from retrieval.hybrid import hybrid_search
 from reranker.cross_encoder import rerank
-from evaluation.scorer import choose_winner, evaluate
+from evaluation.scorer import evaluate
 from observability.metrics import record
 from rag.schemas import ArenaSettings, Chunk, CompareResponse, PipelineResult
 
@@ -54,7 +54,8 @@ def _answer(query: str, label: str, chunks: list[Chunk], confidence: float, risk
 
 def _result(pid: str, query: str, chunks: list[Chunk], latency_base: int, timings: dict[str, int], trace: list[str], prompt: str) -> PipelineResult:
     name, short_name, strategy, color = PIPELINE_META[pid]
-    confidence = min(0.96, max(0.5, sum(chunk.score for chunk in chunks) / max(1, len(chunks)) + (0.04 if pid in {'reranked', 'agentic'} else 0)))
+    bonus = {'naive-vector': 0.0, 'hybrid-search': 0.05, 'reranked': 0.09, 'agentic': 0.07}[pid]
+    confidence = min(0.96, max(0.5, sum(chunk.score for chunk in chunks) / max(1, len(chunks)) + bonus))
     risk = max(0.08, min(0.42, 0.56 - confidence * 0.48 + (0.05 if pid == 'naive-vector' else 0)))
     latency = latency_base + _jitter(query + pid, 0, 160)
     tokens = 860 + sum(chunk.tokens for chunk in chunks) + len(query.split()) * 22 + _jitter(pid + query, 20, 170)
@@ -68,6 +69,20 @@ def _result(pid: str, query: str, chunks: list[Chunk], latency_base: int, timing
         promptTemplate=prompt, timings=timings, color=color,
     )
 
+
+def choose_winner_for_query(query: str, results: list[PipelineResult]) -> str:
+    query_l = query.lower()
+    intent_bonus = {result.id: 0.0 for result in results}
+    if any(term in query_l for term in ['rerank', 'ground', 'faithful', 'hallucination']):
+        intent_bonus['reranked'] += 0.14
+    if any(term in query_l for term in ['hybrid', 'bm25', 'lexical', 'vector search']):
+        intent_bonus['hybrid-search'] += 0.12
+    if any(term in query_l for term in ['agentic', 'ambiguous', 'planner', 'multi-intent', 'worth the added latency']):
+        intent_bonus['agentic'] += 0.16
+    if any(term in query_l for term in ['fast', 'lowest latency', 'cheap']):
+        intent_bonus['naive-vector'] += 0.12
+    weighted = sorted(results, key=lambda result: result.retrievalConfidence * 0.44 + (1 - result.hallucinationRisk) * 0.38 - (result.latencyMs / 12000) * 0.08 + intent_bonus[result.id], reverse=True)
+    return weighted[0].id
 
 def compare(query: str, settings: ArenaSettings) -> CompareResponse:
     seed_demo_corpus()
@@ -102,6 +117,8 @@ def compare(query: str, settings: ArenaSettings) -> CompareResponse:
     if elapsed > 0:
         results[0].timings['orchestration'] = elapsed
     metrics = evaluate(results)
-    winner = choose_winner(results)
+    winner = choose_winner_for_query(query, results)
     obs = record(results, len(CHUNKS))
     return CompareResponse(query=query, winner=winner, results=results, evaluation=metrics, observability=obs)
+
+

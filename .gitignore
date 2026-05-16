@@ -15,3 +15,8 @@ backend/data/uploads/
 sample-data/downloads/
 .DS_Store
 .vercel/
+
+frontend/test-results/
+frontend/playwright-report/
+frontend/blob-report/
+frontend/tsconfig.tsbuildinfo

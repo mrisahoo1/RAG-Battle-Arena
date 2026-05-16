@@ -4,12 +4,12 @@ import { formatCurrency, formatMs } from '@/lib/utils';
 
 export function ObservabilityStrip({ snapshot }: { snapshot: ObservabilitySnapshot }) {
   const items = [
-    { label: 'Requests', value: snapshot.requests.toLocaleString(), icon: Activity },
+    { label: 'Requests', value: snapshot.requests.toLocaleString('en-US'), icon: Activity },
     { label: 'Avg latency', value: formatMs(snapshot.avgLatencyMs), icon: Clock },
-    { label: 'Token spend', value: snapshot.tokens.toLocaleString(), icon: Zap },
+    { label: 'Token spend', value: snapshot.tokens.toLocaleString('en-US'), icon: Zap },
     { label: 'Est. cost', value: formatCurrency(snapshot.estimatedCost), icon: Coins },
     { label: 'Cache hits', value: `${Math.round(snapshot.cacheHitRate * 100)}%`, icon: Database },
-    { label: 'Chunks indexed', value: snapshot.chunkCount.toLocaleString(), icon: Boxes }
+    { label: 'Chunks indexed', value: snapshot.chunkCount.toLocaleString('en-US'), icon: Boxes }
   ];
 
   return (
@@ -26,3 +26,4 @@ export function ObservabilityStrip({ snapshot }: { snapshot: ObservabilitySnapsh
     </section>
   );
 }
+

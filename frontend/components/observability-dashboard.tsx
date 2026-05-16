@@ -21,7 +21,8 @@ export function ObservabilityDashboard() {
       <section className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
         <div className="glass-panel rounded-lg p-5">
           <h2 className="text-lg font-semibold text-white">Latency and token consumption</h2>
-          <ChartShell className="mt-5 h-[380px]">`n            <ResponsiveContainer width="100%" height="100%">
+          <ChartShell className="mt-5 h-[380px]">
+            <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={timeline}>
                 <CartesianGrid stroke="rgba(148,163,184,.12)" vertical={false} />
                 <XAxis dataKey="t" stroke="#64748b" tickLine={false} axisLine={false} />
@@ -30,11 +31,13 @@ export function ObservabilityDashboard() {
                 <Area type="monotone" dataKey="latency" stroke="#27d8ff" fill="#27d8ff" fillOpacity={0.15} />
                 <Area type="monotone" dataKey="tokens" stroke="#ffb454" fill="#ffb454" fillOpacity={0.08} />
               </AreaChart>
-            </ResponsiveContainer>`n          </ChartShell>
+            </ResponsiveContainer>
+          </ChartShell>
         </div>
         <div className="glass-panel rounded-lg p-5">
           <h2 className="text-lg font-semibold text-white">Pipeline timing breakdown</h2>
-          <ChartShell className="mt-5 h-[380px]">`n            <ResponsiveContainer width="100%" height="100%">
+          <ChartShell className="mt-5 h-[380px]">
+            <ResponsiveContainer width="100%" height="100%">
               <BarChart data={latencySeries}>
                 <XAxis dataKey="name" stroke="#64748b" tickLine={false} axisLine={false} />
                 <YAxis stroke="#64748b" tickLine={false} axisLine={false} />
@@ -43,10 +46,12 @@ export function ObservabilityDashboard() {
                 <Bar dataKey="rerank" stackId="a" fill="#ffb454" />
                 <Bar dataKey="generation" stackId="a" fill="#b7ff5a" radius={[4, 4, 0, 0]} />
               </BarChart>
-            </ResponsiveContainer>`n          </ChartShell>
+            </ResponsiveContainer>
+          </ChartShell>
         </div>
       </section>
     </div>
   );
 }
+
 

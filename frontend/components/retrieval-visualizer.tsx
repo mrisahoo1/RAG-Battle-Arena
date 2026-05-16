@@ -27,7 +27,8 @@ export function RetrievalVisualizer({ results }: { results: PipelineResult[] }) 
           <h2 className="text-lg font-semibold text-white">Embedding similarity graph</h2>
         </div>
         <p className="mt-2 text-sm text-slate-400">Chunk position versus retrieval score across the four architectures.</p>
-        <ChartShell className="mt-4 h-[320px]">`n          <ResponsiveContainer width="100%" height="100%">
+        <ChartShell className="mt-4 h-[320px]">
+          <ResponsiveContainer width="100%" height="100%">
             <ScatterChart margin={{ top: 20, right: 20, bottom: 10, left: 0 }}>
               <XAxis dataKey="x" name="chunk" stroke="#64748b" tickLine={false} axisLine={false} />
               <YAxis dataKey="y" name="score" stroke="#64748b" tickLine={false} axisLine={false} />
@@ -37,7 +38,10 @@ export function RetrievalVisualizer({ results }: { results: PipelineResult[] }) 
                 <Scatter key={result.id} name={result.shortName} data={scatter.filter((item) => item.fill === result.color)} fill={result.color} />
               ))}
             </ScatterChart>
-          </ResponsiveContainer>`n        </ChartShell>`n      </div>`n      <div className="glass-panel rounded-lg p-4">
+          </ResponsiveContainer>
+        </ChartShell>
+      </div>
+      <div className="glass-panel rounded-lg p-4">
         <h2 className="text-lg font-semibold text-white">Initial retrieval to reranking</h2>
         <div className="mt-5 space-y-4">
           {['Initial retrieval', 'Fusion and filtering', 'Cross encoder rerank', 'Final context'].map((stage, index) => (
@@ -77,4 +81,5 @@ function Heat({ value, label }: { value: number; label: string }) {
     </div>
   );
 }
+
 

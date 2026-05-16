@@ -35,7 +35,8 @@ export function EvaluationDashboard() {
             <ShieldCheck className="h-4 w-4 text-signal" />
             <h2 className="text-lg font-semibold text-white">LLM-as-judge radar</h2>
           </div>
-          <ChartShell className="mt-5 h-[420px]">`n            <ResponsiveContainer width="100%" height="100%">
+          <ChartShell className="mt-5 h-[420px]">
+            <ResponsiveContainer width="100%" height="100%">
               <RadarChart data={evaluation}>
                 <PolarGrid stroke="rgba(148,163,184,.2)" />
                 <PolarAngleAxis dataKey="metric" tick={{ fill: '#94a3b8', fontSize: 12 }} />
@@ -45,11 +46,13 @@ export function EvaluationDashboard() {
                 <Radar name="Rerank" dataKey="reranked" stroke="#ffb454" fill="#ffb454" fillOpacity={0.10} />
                 <Radar name="Agentic" dataKey="agentic" stroke="#ff5c8a" fill="#ff5c8a" fillOpacity={0.10} />
               </RadarChart>
-            </ResponsiveContainer>`n          </ChartShell>
+            </ResponsiveContainer>
+          </ChartShell>
         </div>
         <div className="glass-panel rounded-lg p-5">
           <h2 className="text-lg font-semibold text-white">Risk, confidence, latency</h2>
-          <ChartShell className="mt-5 h-[420px]">`n            <ResponsiveContainer width="100%" height="100%">
+          <ChartShell className="mt-5 h-[420px]">
+            <ResponsiveContainer width="100%" height="100%">
               <BarChart data={bars}>
                 <XAxis dataKey="name" stroke="#64748b" tickLine={false} axisLine={false} />
                 <YAxis stroke="#64748b" tickLine={false} axisLine={false} />
@@ -58,10 +61,12 @@ export function EvaluationDashboard() {
                 <Bar dataKey="risk" fill="#ff5c8a" radius={[5, 5, 0, 0]} />
                 <Bar dataKey="latency" fill="#ffb454" radius={[5, 5, 0, 0]} />
               </BarChart>
-            </ResponsiveContainer>`n          </ChartShell>
+            </ResponsiveContainer>
+          </ChartShell>
         </div>
       </section>
     </div>
   );
 }
+
 

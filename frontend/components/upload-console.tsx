@@ -53,7 +53,7 @@ export function UploadConsole() {
               <div className="mt-0.5 rounded-md bg-white/7 p-2 text-slate-300"><FileText className="h-4 w-4" /></div>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-white">{document.name}</p>
-                <p className="mt-1 text-xs text-slate-500">{document.chunkCount} chunks · {document.tokenCount.toLocaleString()} tokens</p>
+                <p className="mt-1 text-xs text-slate-500">{document.chunkCount} chunks · {document.tokenCount.toLocaleString('en-US')} tokens</p>
               </div>
               {document.status !== 'ready' ? <Loader2 className="h-4 w-4 animate-spin text-signal" /> : <span className="rounded-full bg-lime/12 px-2 py-1 text-xs text-lime">ready</span>}
             </div>
@@ -63,3 +63,4 @@ export function UploadConsole() {
     </section>
   );
 }
+
