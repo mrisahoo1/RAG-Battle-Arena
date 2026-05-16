@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: rag-battle-arena-api
+    env: docker
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: ENABLE_DEMO_MODE
+        value: true
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: DATABASE_URL
+        fromDatabase:
+          name: rag-battle-arena-postgres
+          property: connectionString
+
+databases:
+  - name: rag-battle-arena-postgres
+    plan: starter
