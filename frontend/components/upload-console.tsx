@@ -9,7 +9,7 @@ const stages = ['Parse', 'Chunk', 'Embed', 'Index'];
 
 export function UploadConsole() {
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { documents, uploadProgress, simulateUpload } = useArenaStore();
+  const { documents, uploadProgress, ingestDocument } = useArenaStore();
   const activeStage = Math.min(stages.length - 1, Math.floor(uploadProgress / 25));
 
   return (
@@ -32,7 +32,8 @@ export function UploadConsole() {
           className="hidden"
           onChange={(event) => {
             const file = event.target.files?.[0];
-            if (file) void simulateUpload(file.name);
+            if (file) void ingestDocument(file);
+            event.target.value = '';
           }}
         />
       </div>
@@ -63,4 +64,3 @@ export function UploadConsole() {
     </section>
   );
 }
-

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import re
 import time
 from ingestion.pipeline import CHUNKS, seed_demo_corpus
 from ingestion.chunker import TextChunk
@@ -18,10 +19,65 @@ PIPELINE_META = {
     'agentic': ('Agentic RAG', 'Agentic', 'Query rewriting, retrieval planning, confidence checks, and targeted retries.', '#ff5c8a'),
 }
 
+STOPWORDS = {
+    'a', 'an', 'and', 'are', 'as', 'based', 'be', 'by', 'for', 'from', 'give', 'gives', 'how', 'i', 'in', 'is',
+    'it', 'me', 'of', 'on', 'or', 'that', 'the', 'this', 'to', 'use', 'uses', 'what', 'when', 'which', 'why', 'with', 'you'
+}
+
+PIPELINE_NOTES = {
+    'Naive Vector RAG': 'Vector-only retrieval is fast and semantic, but it may pull broader context when the question depends on exact document wording.',
+    'Hybrid Search RAG': 'Hybrid retrieval combines semantic vector recall with lexical BM25 matching, so exact terms from the document carry more weight.',
+    'Reranked RAG': 'Reranked retrieval promotes the chunks whose wording is most directly grounded in the question before composing the answer.',
+    'Agentic RAG': 'Agentic retrieval rewrites the question into retrieval intents, checks evidence coverage, and returns a trace for ambiguous audit-style asks.',
+}
+
 
 def _jitter(seed: str, minimum: int, maximum: int) -> int:
     digest = hashlib.sha256(seed.encode('utf-8')).hexdigest()
     return minimum + int(digest[:8], 16) % (maximum - minimum + 1)
+
+
+def _query_terms(query: str) -> set[str]:
+    return {term for term in re.findall(r'[a-z0-9]+', query.lower()) if len(term) > 2 and term not in STOPWORDS}
+
+
+def _split_sentences(text: str) -> list[str]:
+    normalized = re.sub(r'\s+', ' ', text).strip()
+    if not normalized:
+        return []
+    parts = re.split(r'(?<=[.!?])\s+', normalized)
+    return [part.strip(' -') for part in parts if part.strip(' -')]
+
+
+def _sentence_score(sentence: str, query_terms: set[str], chunk_score: float) -> float:
+    sentence_l = sentence.lower()
+    overlap = sum(1 for term in query_terms if term in sentence_l)
+    audit_bonus = 1.5 if 'audit' in query_terms and 'audit' in sentence_l else 0.0
+    return overlap * 2.0 + audit_bonus + chunk_score
+
+
+def _evidence_sentences(query: str, chunks: list[Chunk], limit: int = 3) -> list[tuple[str, str]]:
+    query_terms = _query_terms(query)
+    candidates: list[tuple[float, str, str]] = []
+    for chunk in chunks:
+        for sentence in _split_sentences(chunk.text):
+            score = _sentence_score(sentence, query_terms, chunk.score)
+            if score > 0:
+                candidates.append((score, sentence, chunk.id))
+        if not candidates and chunk.text:
+            candidates.append((chunk.score, chunk.text.strip()[:260], chunk.id))
+    ordered = sorted(candidates, key=lambda item: item[0], reverse=True)
+    selected: list[tuple[str, str]] = []
+    seen: set[str] = set()
+    for _, sentence, chunk_id in ordered:
+        compact = sentence.lower()
+        if compact in seen:
+            continue
+        seen.add(compact)
+        selected.append((sentence[:340], chunk_id))
+        if len(selected) == limit:
+            break
+    return selected
 
 
 def _to_chunk(chunk: TextChunk, score: float, vector_score: float | None = None, bm25_score: float | None = None, rerank_score: float | None = None) -> Chunk:
@@ -41,15 +97,20 @@ def _to_chunk(chunk: TextChunk, score: float, vector_score: float | None = None,
 
 def _answer(query: str, label: str, chunks: list[Chunk], confidence: float, risk: float) -> str:
     citations = ', '.join(chunk.id for chunk in chunks[:3])
-    if label == 'Naive Vector RAG':
-        posture = 'It found broad semantic evidence quickly, but the context is less disciplined when exact entities or evaluation terms matter.'
-    elif label == 'Hybrid Search RAG':
-        posture = 'It balanced semantic recall with lexical precision, preserving acronyms and exact terminology while still finding related evidence.'
-    elif label == 'Reranked RAG':
-        posture = 'It produced the strongest grounded answer by collecting a wider candidate set and promoting the evidence most directly aligned with the question.'
-    else:
-        posture = 'It decomposed the request into retrieval intents, planned search, retried low-confidence paths, and returned the richest diagnostic trace.'
-    return f'For "{query}", {label} reached {confidence:.0%} retrieval confidence with {risk:.0%} hallucination risk. {posture} The answer is grounded in {citations}.'
+    evidence = _evidence_sentences(query, chunks)
+    note = PIPELINE_NOTES[label]
+    if not evidence:
+        return (
+            f'{label} did not find enough document evidence to answer "{query}" confidently. '
+            f'Retrieval confidence is {confidence:.0%}, hallucination risk is {risk:.0%}, and the closest citations are {citations}. '
+            'Upload a more relevant document or broaden retrieval settings.'
+        )
+
+    evidence_text = ' '.join(f'{sentence} [{chunk_id}]' for sentence, chunk_id in evidence)
+    return (
+        f'{label} answer for "{query}": {evidence_text} '
+        f'{note} Retrieval confidence: {confidence:.0%}. Hallucination risk: {risk:.0%}. Citations: {citations}.'
+    )
 
 
 def _result(pid: str, query: str, chunks: list[Chunk], latency_base: int, timings: dict[str, int], trace: list[str], prompt: str) -> PipelineResult:
@@ -84,6 +145,7 @@ def choose_winner_for_query(query: str, results: list[PipelineResult]) -> str:
     weighted = sorted(results, key=lambda result: result.retrievalConfidence * 0.44 + (1 - result.hallucinationRisk) * 0.38 - (result.latencyMs / 12000) * 0.08 + intent_bonus[result.id], reverse=True)
     return weighted[0].id
 
+
 def compare(query: str, settings: ArenaSettings) -> CompareResponse:
     seed_demo_corpus()
     started = time.perf_counter()
@@ -107,10 +169,10 @@ def compare(query: str, settings: ArenaSettings) -> CompareResponse:
     rewrite_ms = _jitter(query + 'rewrite', 220, 340)
 
     results = [
-        _result('naive-vector', query, vector_chunks, 820, {'rewrite': 0, 'vector': vector_ms, 'bm25': 0, 'rerank': 0, 'generation': 720}, ['Embedded the query.', 'Retrieved top semantic neighbors.', 'Packed top chunks by vector score.', 'Generated answer from unreranked context.'], 'Answer with citations using retrieved chunks. Refuse claims not present in context.'),
-        _result('hybrid-search', query, hybrid_chunks, 1120, {'rewrite': 0, 'vector': vector_ms, 'bm25': hybrid_ms - vector_ms, 'rerank': 0, 'generation': 910}, ['Ran vector retrieval.', 'Ran BM25 retrieval.', 'Fused ranks with lexical boost.', 'Generated answer from balanced context.'], 'Prefer cited evidence that appears in both semantic and lexical retrieval.'),
-        _result('reranked', query, reranked_chunks, 1540, {'rewrite': 0, 'vector': vector_ms, 'bm25': hybrid_ms - vector_ms, 'rerank': rerank_ms, 'generation': 930}, ['Retrieved a broad candidate set.', 'Scored query-chunk pairs with a cross encoder.', 'Moved directly grounded evidence upward.', 'Generated with high citation pressure.'], 'Use only reranked context. Explain uncertainty and cite every material claim.'),
-        _result('agentic', query, agentic_chunks, 2180, {'rewrite': rewrite_ms, 'vector': vector_ms + 32, 'bm25': hybrid_ms - vector_ms + 40, 'rerank': rerank_ms, 'generation': 1280}, ['Rewrote the query into retrieval intents.', 'Selected hybrid retrieval with metadata filtering.', 'Retried low-confidence subqueries.', 'Synthesized answer with planning trace.'], 'Plan retrieval, gather evidence, validate coverage, then answer with traceable citations.'),
+        _result('naive-vector', query, vector_chunks, 820, {'rewrite': 0, 'vector': vector_ms, 'bm25': 0, 'rerank': 0, 'generation': 720}, ['Embedded the query.', 'Retrieved top semantic neighbors.', 'Packed top chunks by vector score.', 'Generated extractive answer from retrieved context.'], 'Answer with citations using retrieved chunks. Refuse claims not present in context.'),
+        _result('hybrid-search', query, hybrid_chunks, 1120, {'rewrite': 0, 'vector': vector_ms, 'bm25': hybrid_ms - vector_ms, 'rerank': 0, 'generation': 910}, ['Ran vector retrieval.', 'Ran BM25 retrieval.', 'Fused ranks with lexical boost.', 'Generated extractive answer from balanced context.'], 'Prefer cited evidence that appears in both semantic and lexical retrieval.'),
+        _result('reranked', query, reranked_chunks, 1540, {'rewrite': 0, 'vector': vector_ms, 'bm25': hybrid_ms - vector_ms, 'rerank': rerank_ms, 'generation': 930}, ['Retrieved a broad candidate set.', 'Scored query-chunk pairs with a cross encoder.', 'Moved directly grounded evidence upward.', 'Generated extractive answer with high citation pressure.'], 'Use only reranked context. Explain uncertainty and cite every material claim.'),
+        _result('agentic', query, agentic_chunks, 2180, {'rewrite': rewrite_ms, 'vector': vector_ms + 32, 'bm25': hybrid_ms - vector_ms + 40, 'rerank': rerank_ms, 'generation': 1280}, ['Rewrote the query into retrieval intents.', 'Selected hybrid retrieval with metadata filtering.', 'Retried low-confidence subqueries.', 'Synthesized extractive answer with planning trace.'], 'Plan retrieval, gather evidence, validate coverage, then answer with traceable citations.'),
     ]
 
     elapsed = int((time.perf_counter() - started) * 1000)
@@ -120,5 +182,3 @@ def compare(query: str, settings: ArenaSettings) -> CompareResponse:
     winner = choose_winner_for_query(query, results)
     obs = record(results, len(CHUNKS))
     return CompareResponse(query=query, winner=winner, results=results, evaluation=metrics, observability=obs)
-
-

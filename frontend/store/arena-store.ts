@@ -1,7 +1,7 @@
 'use client';
 
 import { create } from 'zustand';
-import { comparePipelines, listDocuments } from '@/services/api';
+import { comparePipelines, listDocuments, uploadDocument } from '@/services/api';
 import { demoCompare, demoDocuments } from '@/lib/mock-data';
 import type { ArenaSettings, CompareResponse, DocumentRecord, PipelineId } from '@/types/rag';
 
@@ -18,7 +18,7 @@ type ArenaState = {
   setActivePipeline: (pipeline: PipelineId | null) => void;
   runComparison: () => Promise<void>;
   hydrateDocuments: () => Promise<void>;
-  simulateUpload: (fileName: string) => Promise<void>;
+  ingestDocument: (file: File) => Promise<void>;
 };
 
 const defaultSettings: ArenaSettings = {
@@ -53,27 +53,12 @@ export const useArenaStore = create<ArenaState>((set, get) => ({
     const comparison = await comparePipelines(query, settings);
     set({ comparison, isRunning: false });
   },
-  simulateUpload: async (fileName) => {
-    set({ uploadProgress: 0 });
-    const stages = [18, 42, 64, 84, 100];
-    for (const progress of stages) {
-      await new Promise((resolve) => setTimeout(resolve, 260));
-      set({ uploadProgress: progress });
-    }
-    const extension = fileName.toLowerCase().endsWith('.pdf') ? 'pdf' : fileName.toLowerCase().endsWith('.docx') ? 'docx' : 'txt';
-    set((state) => ({
-      documents: [
-        {
-          id: `doc-${Date.now()}`,
-          name: fileName,
-          type: extension,
-          status: 'ready',
-          chunkCount: Math.max(12, Math.round(fileName.length * 1.4)),
-          tokenCount: Math.max(2100, fileName.length * 410),
-          createdAt: new Date().toISOString()
-        },
-        ...state.documents
-      ]
-    }));
+  ingestDocument: async (file) => {
+    const { settings } = get();
+    set({ uploadProgress: 8 });
+    await new Promise((resolve) => setTimeout(resolve, 180));
+    set({ uploadProgress: 32 });
+    const document = await uploadDocument(file, settings);
+    set((state) => ({ documents: [document, ...state.documents], uploadProgress: 100 }));
   }
 }));

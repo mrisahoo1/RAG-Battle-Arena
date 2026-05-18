@@ -26,6 +26,30 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+export async function uploadDocument(file: File, settings: ArenaSettings): Promise<DocumentRecord> {
+  if (!API_BASE_URL) {
+    throw Object.assign(new Error('Backend URL is not configured'), { status: 0 }) as ApiError;
+  }
+
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('chunk_strategy', 'recursive');
+  formData.append('chunk_size', String(settings.chunkSize));
+  formData.append('overlap', String(settings.overlap));
+
+  const response = await fetch(`${API_BASE_URL}/upload`, {
+    method: 'POST',
+    body: formData
+  });
+
+  if (!response.ok) {
+    const error = Object.assign(new Error(`Upload failed: ${response.status}`), { status: response.status }) as ApiError;
+    throw error;
+  }
+
+  return response.json() as Promise<DocumentRecord>;
+}
+
 export async function comparePipelines(query: string, settings: ArenaSettings): Promise<CompareResponse> {
   try {
     return await request<CompareResponse>('/compare', {

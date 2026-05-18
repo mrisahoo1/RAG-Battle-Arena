@@ -54,3 +54,25 @@ def test_metrics_endpoint_returns_observability_snapshot():
     assert payload['requests'] >= 1
     assert payload['avgLatencyMs'] > 0
     assert payload['chunkCount'] > 0
+
+
+def test_uploaded_document_is_used_for_grounded_answers():
+    audit_text = (
+        'Use Case: Audit Control Monitoring. '
+        'Application: Continuous audit exception review for finance controls and procurement approvals. '
+        'The audit application ranks risky transactions and cites the control evidence used by reviewers.'
+    )
+    upload = client.post('/upload', files={'file': ('audit-use-case.txt', audit_text.encode('utf-8'), 'text/plain')})
+    assert upload.status_code == 200
+    document_id = upload.json()['id']
+
+    response = client.post('/compare', json={'query': 'Which use case gives me an application for Audit based use case ?'})
+    assert response.status_code == 200
+    payload = response.json()
+    answers = ' '.join(result['answer'] for result in payload['results'])
+    retrieved_document_ids = {chunk['documentId'] for result in payload['results'] for chunk in result['retrievedChunks']}
+
+    assert document_id in retrieved_document_ids
+    assert 'Audit Control Monitoring' in answers
+    assert 'Continuous audit exception review' in answers
+    assert 'It decomposed the request into retrieval intents' not in answers

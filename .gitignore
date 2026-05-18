@@ -21,3 +21,4 @@ frontend/playwright-report/
 frontend/blob-report/
 frontend/tsconfig.tsbuildinfo
 .tools/
+data/uploads/
